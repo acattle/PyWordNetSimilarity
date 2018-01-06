@@ -25,6 +25,7 @@ from uuid import uuid4
 import pickle
 import re
 import timeit
+from collections import defaultdict
 
 class ExtendedLesk:
     
@@ -48,7 +49,7 @@ class ExtendedLesk:
         
         self._cache=None
         if cache:
-            self._cache={}
+            self._cache=defaultdict(dict)
             
     
     def _getLeadingStopwordCount(self, text):
@@ -110,6 +111,8 @@ class ExtendedLesk:
             :return: A relatedness score which is greater-than or equal-to 0
             :rtype: int
         """
+        text_a = list(text_a) #to avoid accidentally editing the list in place
+        text_b = list(text_b)
         
         sm = difflib.SequenceMatcher(None, text_a, text_b, autojunk=False)
         
@@ -154,16 +157,34 @@ class ExtendedLesk:
             :rtype: flaot
         """
         relatedness_score = 0
+        
         for a_funcs, b_funcs, weight in self.relations:
+            text_a = synsets_a            
             #apply the relevant functions to the first group of synsets
-            text_a = synsets_a
             for a_func in a_funcs:
-                text_a = a_func(text_a)
+                a_func_str = str(a_func)
+                text_a_str = str(text_a)
+                if (self._cache != None) and (text_a_str in self._cache[a_func_str]):
+                    text_a = self._cache[a_func_str][text_a_str]
+                else:
+                    text_a = a_func(text_a)
+                
+                    if (self._cache != None):
+                        self._cache[a_func_str][text_a_str] = text_a
             
-            #apply the relevant functions to the second group of synsets
             text_b = synsets_b
+            #apply the relevant functions to the second group of synsets
             for b_func in b_funcs:
-                text_b = b_func(text_b)
+                b_func_str = str(b_func)
+                text_b_str = str(text_b)
+                if (self._cache != None) and (text_b_str in self._cache[b_func_str]):
+                    text_b = self._cache[b_func_str][text_b_str]
+                
+                else:
+                    text_b = b_func(text_b)
+                
+                    if (self._cache != None):
+                        self._cache[b_func_str][text_b_str] = text_b
             
             #get the overlap between text_a and text_b and update the relatedness score accordingly
             overlap_score = self.getTextOverlapScore(text_a, text_b)
@@ -184,21 +205,6 @@ class ExtendedLesk:
             :rtype: flaot
         """
         
-        if (self._cache != None) and (word_a in self._cache):
-            synsets_a = self._cache[word_a]
-        else:
-            synsets_a = wn.synsets(re.sub(" ", "_", word_a))
-            
-            if self._cache != None:
-                self._cache[word_a] = synsets_a
-                
-        if (self._cache != None) and (word_b in self._cache):
-            synsets_b = self._cache[word_b]
-        else:
-            synsets_b = wn.synsets(re.sub(" ", "_", word_b))
-            
-            if self._cache != None:
-                self._cache[word_b] = synsets_b
         synsets_a = wn.synsets(re.sub(" ", "_", word_a))
         synsets_b = wn.synsets(re.sub(" ", "_", word_b))
         
@@ -214,7 +220,7 @@ if __name__ == '__main__':
     print ("starting")
 #     el = ExtendedLesk(relations_file)
 #     print(timeit.timeit("[el.getWordRelatedness(a, b) for a,b in wp[:10]]", "from __main__ import wp,el"))
-    el = ExtendedLesk(relations_file)
+    el = ExtendedLesk(relations_file, cache=False)
     print(el.getWordRelatedness("car", "bus"))
 #     print(timeit.timeit("[el.getWordRelatedness(a, b) for a,b in wp[:10]]", "from __main__ import wp,el", number=100))
     print(timeit.timeit("el.getWordRelatedness('car','bus')", "from __main__ import wp,el", number=1000))
