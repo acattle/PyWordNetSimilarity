@@ -15,6 +15,7 @@
     Conference on Intelligent Text Processing and Computational Linguistics
     (pp. 136-145). Springer, Berlin, Heidelberg.
 '''
+
 from __future__ import print_function #for Python 2.7 compatibility
 from nltk.corpus import wordnet as wn
 from nltk.corpus import stopwords as sw
@@ -35,6 +36,8 @@ class ExtendedLesk:
             :type relations_loc: str
             :param stopwords: set of stopwords to be excluded from beginning/end of overlaps. If None, NLTK English stopwords are used.
             :type stopwords: list(str)
+            :param cache: whether results should be cached
+            :type cache: bool
         """
         #TODO: make relations optional
         self.relations = read_relation_file(relations_loc)
@@ -123,10 +126,15 @@ class ExtendedLesk:
                 score = score + length_without_stopwords**2
                 
                 #replace the match in both text_a and text_b with unique separators to prevent matching across this boundary again
-                text_a = text_a[:a_start] + [uuid4()] + text_a[a_start+length:]
-                text_b = text_b[:b_start] + [uuid4()] + text_b[b_start+length:]
+                text_a[a_start:a_start+length] = [int(uuid4())] #casting uuid to int causes a slight speedup
+                text_b[b_start:b_start+length] = [int(uuid4())]
+                #replacing a slice with an iterable is more efficient than using list concatenation
+                #https://stackoverflow.com/questions/12088089/python-list-concatenation-efficiency
+                
                 #update the sequence matcher
-                sm.set_seqs(text_a, text_b)
+                sm = difflib.SequenceMatcher(None, text_a, text_b, autojunk=False)
+                #Previously we used sm.set_seqs() but this caused an issue with the more efficient list alteration
+                #where SequenceMatcher's cache wasn't updating
             else:
                 #match length 0. No more matches
                 match_found = False  
@@ -191,6 +199,8 @@ class ExtendedLesk:
             
             if self._cache != None:
                 self._cache[word_b] = synsets_b
+        synsets_a = wn.synsets(re.sub(" ", "_", word_a))
+        synsets_b = wn.synsets(re.sub(" ", "_", word_b))
         
         return self.getSynsetRelatedness(synsets_a, synsets_b)
             
@@ -198,14 +208,16 @@ class ExtendedLesk:
 if __name__ == '__main__':
     relations_file = "lesk-relation.dat"
     
-    with open("d:/workspace/HumourDetection/src/evocation_estimation/features/usf/word_pairs.pkl", "rb") as wp_file:
+    with open("d:/git/HumourDetection/HumourDetection/src/evocation_estimation/features/usf/word_pairs.pkl", "rb") as wp_file:
         wp = pickle.load(wp_file, encoding="latin1")
     wn.ensure_loaded()
     print ("starting")
+#     el = ExtendedLesk(relations_file)
+#     print(timeit.timeit("[el.getWordRelatedness(a, b) for a,b in wp[:10]]", "from __main__ import wp,el"))
     el = ExtendedLesk(relations_file)
-    print(timeit.timeit("[el.getWordRelatedness(a, b) for a,b in wp[:10]]", "from __main__ import wp,el"))
-    el = ExtendedLesk(relations_file,cache=True)
-    print(timeit.timeit("[el.getWordRelatedness(a, b) for a,b in wp[:10]]", "from __main__ import wp,el"))
+    print(el.getWordRelatedness("car", "bus"))
+#     print(timeit.timeit("[el.getWordRelatedness(a, b) for a,b in wp[:10]]", "from __main__ import wp,el", number=100))
+    print(timeit.timeit("el.getWordRelatedness('car','bus')", "from __main__ import wp,el", number=1000))
     
 #     for a,b in wp[:100]:
 #         print("{}-{}: {}".format(a,b,el.getWordRelatedness(a, b)))

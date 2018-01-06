@@ -6,6 +6,11 @@
     Wrappers for nltk.corpus.wordnet functions to ensure proper format for
     difflib.SequenceMatcher
 '''
+
+#Avoiding using list.extend() and instead using += results in a slight speed increase
+#Same is not true for list.append()
+#Similarly, casting uuids to int seems to speed things up a small amount too
+
 from uuid import uuid4
 
 def concat_definitions(synsets):
@@ -26,10 +31,10 @@ def concat_definitions(synsets):
         #unless this is the first definition, insert a unique separator between definitions
         #since definitions are in an arbitrary order, we want to prevent matching across definition boundaries
         if i > 0:
-            definition_words.append(uuid4())
+            definition_words.append(int(uuid4()))
         
         definition = synset.definition().lower()
-        definition_words.extend(definition.split())
+        definition_words += definition.split()
     
     return definition_words
         
@@ -54,9 +59,9 @@ def concat_examples(synsets):
             #unless this is the first example, insert a unique separator between definitions
             #since examples are in an arbitrary order, we want to prevent matching across example boundaries
             if (i+j) > 0:
-                example_words.append(uuid4())
+                example_words.append(int(uuid4()))
             
-            example_words.extend(example.split())
+            example_words += example.split()
     
     return example_words
 
@@ -81,10 +86,10 @@ def concat_lemmas(synsets):
             #unless this is the first lemma, insert a unique separator between definitions
             #since lemmas are in an arbitrary order, we want to prevent matching multiple lemmas at a time
             if (i+j) > 0:
-                lemmas.append(uuid4())
+                lemmas.append(int(uuid4()))
             
             #splitting the lemma names by "_" helps when matching lemmas against examples or definitions
-            lemmas.extend(lemma_name.split("_"))
+            lemmas += lemma_name.split("_")
     
     return lemmas
 
@@ -105,16 +110,16 @@ def get_also_sees(synsets):
     #but it doesn't return the also_sees from refresh.v.04's
     #For simplicity, we return all also_sees whether they're from synsets or the synsets' lemmas
     
-    also_sees=[]
+    also_sees=[] #TODO: should I use a set to avoid repeat definitions?
     
     for synset in synsets:
         #add synset-level also_sees
-        also_sees.extend(synset.also_sees())
+        also_sees += synset.also_sees()
         
         #add lemma-level also_sees
         for lemma in synset.lemmas():
             for also_see in lemma.also_sees():
-                also_sees.append(also_see.synset()) #TODO: should I use a set to avoid repeat definitions?
+                also_sees.append(also_see.synset())
     
     return also_sees
 
@@ -130,12 +135,12 @@ def get_hypernyms(synsets):
         :rtype: list(nltk.corpus.wordnet.Synset)
     '''
     
-    hypernyms=[]
+    hypernyms=[] #TODO: should I use a set to avoid repeat definitions?
     
     for synset in synsets:
         #Perl library WordNet::Similarity doesn't seem to differentiate hypernyms and instance_hypernyms. Neither should we.
-        hypernyms.extend(synset.hypernyms()) #TODO: should I use a set to avoid repeat definitions?        
-        hypernyms.extend(synset.instance_hypernyms())
+        hypernyms += synset.hypernyms()
+        hypernyms += synset.instance_hypernyms()
     
     return hypernyms
 
@@ -151,12 +156,12 @@ def get_hyponyms(synsets):
         :rtype: list(nltk.corpus.wordnet.Synset)
     '''
     
-    hyponyms=[]
+    hyponyms=[] #TODO: should I use a set to avoid repeat definitions?
     
     for synset in synsets:
         #Perl library WordNet::Similarity doesn't seem to differentiate hyponyms and instance_hyponyms. Neither should we.
-        hyponyms.extend(synset.hyponyms()) #TODO: should I use a set to avoid repeat definitions?        
-        hyponyms.extend(synset.instance_hyponyms())
+        hyponyms += synset.hyponyms()
+        hyponyms += synset.instance_hyponyms()
     
     return hyponyms
 
@@ -172,13 +177,13 @@ def get_holonyms(synsets):
         :rtype: list(nltk.corpus.wordnet.Synset)
     '''
     
-    holonyms=[]
+    holonyms=[] #TODO: should I use a set to avoid repeat definitions?
     
     for synset in synsets:
         #Perl library WordNet::Similarity doesn't seem to differentiate member_holonyms, part_holonyms, and substance_holonyms. Neither should we.
-        holonyms.extend(synset.member_holonyms()) #TODO: should I use a set to avoid repeat definitions?
-        holonyms.extend(synset.part_holonyms())
-        holonyms.extend(synset.substance_holonyms())
+        holonyms += synset.member_holonyms()
+        holonyms += synset.part_holonyms()
+        holonyms += synset.substance_holonyms()
     
     return holonyms
 
@@ -194,13 +199,14 @@ def get_meronyms(synsets):
         :rtype: list(nltk.corpus.wordnet.Synset)
     '''
     
-    meronyms=[]
+    meronyms=[] #TODO: should I use a set to avoid repeat definitions?
     
     for synset in synsets:
         #Perl library WordNet::Similarity doesn't seem to differentiate member_meronyms, part_meronyms, and substance_meronyms. Neither should we.
-        meronyms.extend(synset.member_meronyms()) #TODO: should I use a set to avoid repeat definitions?
-        meronyms.extend(synset.part_meronyms())
-        meronyms.extend(synset.substance_meronyms())
+        meronyms += synset.member_meronyms()
+        meronyms += synset.part_meronyms()
+        meronyms += synset.substance_meronyms()
+
     
     return meronyms
 
@@ -216,10 +222,10 @@ def get_attributes(synsets):
         :rtype: list(nltk.corpus.wordnet.Synset)
     '''
     
-    attributes=[]
+    attributes=[] #TODO: should I use a set to avoid repeat definitions?
     
     for synset in synsets:
-        attributes.extend(synset.attributes()) #TODO: should I use a set to avoid repeat definitions?        
+        attributes += synset.attributes()
     
     return attributes
 
@@ -235,10 +241,10 @@ def get_similar_tos(synsets):
         :rtype: list(nltk.corpus.wordnet.Synset)
     '''
     
-    similar_tos=[]
+    similar_tos=[] #TODO: should I use a set to avoid repeat definitions?
     
     for synset in synsets:
-        similar_tos.extend(synset.similar_tos()) #TODO: should I use a set to avoid repeat definitions?        
+        similar_tos += synset.similar_tos()
     
     return similar_tos
 
@@ -256,11 +262,10 @@ def get_pertainyms(synsets):
     
     #TODO: hardly.r.02 doesn't return any pertainyms in WQordNet::Similarity despite them being in NLTK
     
-    pertainyms=[]
-    
+    pertainyms=[] #TODO: should I use a set to avoid repeat definitions?
     for synset in synsets:
         for lemma in synset.lemmas():
             for pertainym in lemma.pertainyms():
-                pertainyms.append(pertainym.synset()) #TODO: should I use a set to avoid repeat definitions?
+                pertainyms.append(pertainym.synset())
     
     return pertainyms
