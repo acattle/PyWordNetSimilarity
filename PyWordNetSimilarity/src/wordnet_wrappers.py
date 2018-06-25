@@ -12,6 +12,95 @@
 #Similarly, casting uuids to int seems to speed things up a small amount too
 
 from uuid import uuid4
+from functools import lru_cache
+
+
+######################### Caching function wrappers ##########################
+
+_cache_size = None #Max size of LRU cache. None means no limit
+
+@lru_cache(maxsize=_cache_size)
+def _get_lemmas(synset):
+    """
+    Wrapper function for caching NLTK's Synset.lemma()
+    """
+    return synset.lemmas()
+
+@lru_cache(maxsize=_cache_size)
+def _get_lemma_names(synset):
+    """
+    Method for getting list of lemma names.
+    
+    Note that this method does not insert UUIDs between lemma names because
+    the UUIDs would be cached, leading to false matches.
+    """
+    return [l.name().lower() for l in _get_lemmas(synset)]
+
+@lru_cache(maxsize=_cache_size)
+def _get_also_sees(synset):
+    """
+    Wrapper method for caching NLTK's Synset.also_sees() and
+    Lemma.also_sees()
+    """
+    return synset.also_sees()
+
+@lru_cache(maxsize=_cache_size)
+def _get_hypernyms(synset):
+    """
+    Wrapper method for caching NLTK's Synset.hypernyms() and
+    Synset.instance_hypernyms()
+    """
+    return synset.hypernyms() + synset.instance_hypernyms()
+
+@lru_cache(maxsize=_cache_size)
+def _get_hyponyms(synset):
+    """
+    Wrapper method for caching NLTK's Synset.hyponyms()
+    """
+    return synset.hyponyms() + synset.instance_hyponyms()
+
+@lru_cache(maxsize=_cache_size)
+def _get_holonyms(synset):
+    """
+    Wrapper method for caching NLTK's Synset.member_holonyms(),
+    Synset.part_holonyms(), and Synset.substance_holonyms()
+    """
+    return synset.member_holonyms() + synset.part_holonyms() + synset.substance_holonyms()
+
+@lru_cache(maxsize=_cache_size)
+def _get_meronyms(synset):
+    """
+    Wrapper method for caching NLTK's Synset.member_meronyms(),
+    Synset.part_meronyms(), and Synset.substance_meronyms()
+    """
+    return synset.member_meronyms() + synset.part_meronyms() + synset.substance_meronyms()
+
+@lru_cache(maxsize=_cache_size)
+def _get_attributes(synset):
+    """
+    Wrapper method for caching NLTK's Synset.attributes()
+    """
+    return synset.attributes()
+
+@lru_cache(maxsize=_cache_size)
+def _get_similar_tos(synset):
+    """
+    Wrapper method for caching NLTK's Synset.similar_tos()
+    """
+    return synset.attributes()
+
+@lru_cache(maxsize=_cache_size)
+def _get_pertainyms(synset):
+    """
+    Wrapper method for caching NLTK's Lemma.pertainyms()
+    """
+    return [pertainym.synset() for lemma in _get_lemmas(synset) for pertainym in lemma.pertainyms()]
+
+
+
+
+
+######################### WordNet Functions #############################
 
 def concat_definitions(synsets):
     '''
@@ -80,8 +169,7 @@ def concat_lemmas(synsets):
     lemmas=[]
     
     for i, synset in enumerate(synsets):
-        for j, lemma in enumerate(synset.lemmas()):
-            lemma_name = lemma.name().lower()
+        for j, lemma_name in enumerate(_get_lemma_names(synset)):
         
             #unless this is the first lemma, insert a unique separator between definitions
             #since lemmas are in an arbitrary order, we want to prevent matching multiple lemmas at a time
@@ -114,11 +202,11 @@ def get_also_sees(synsets):
     
     for synset in synsets:
         #add synset-level also_sees
-        also_sees += synset.also_sees()
+        also_sees += _get_also_sees(synset)
         
         #add lemma-level also_sees
-        for lemma in synset.lemmas():
-            for also_see in lemma.also_sees():
+        for lemma in _get_lemmas(synset):
+            for also_see in _get_also_sees(lemma):
                 also_sees.append(also_see.synset())
     
     return also_sees
@@ -136,12 +224,9 @@ def get_hypernyms(synsets):
     '''
     
     hypernyms=[] #TODO: should I use a set to avoid repeat definitions?
-    
     for synset in synsets:
         #Perl library WordNet::Similarity doesn't seem to differentiate hypernyms and instance_hypernyms. Neither should we.
-        hypernyms += synset.hypernyms()
-        hypernyms += synset.instance_hypernyms()
-    
+        hypernyms += _get_hypernyms(synset)
     return hypernyms
 
 def get_hyponyms(synsets):
@@ -157,12 +242,9 @@ def get_hyponyms(synsets):
     '''
     
     hyponyms=[] #TODO: should I use a set to avoid repeat definitions?
-    
     for synset in synsets:
         #Perl library WordNet::Similarity doesn't seem to differentiate hyponyms and instance_hyponyms. Neither should we.
-        hyponyms += synset.hyponyms()
-        hyponyms += synset.instance_hyponyms()
-    
+        hyponyms += _get_hyponyms(synset)
     return hyponyms
 
 def get_holonyms(synsets):
@@ -178,12 +260,10 @@ def get_holonyms(synsets):
     '''
     
     holonyms=[] #TODO: should I use a set to avoid repeat definitions?
-    
+    #Perl library WordNet::Similarity doesn't seem to differentiate member_holonyms, part_holonyms, and substance_holonyms. Neither should we.
     for synset in synsets:
         #Perl library WordNet::Similarity doesn't seem to differentiate member_holonyms, part_holonyms, and substance_holonyms. Neither should we.
-        holonyms += synset.member_holonyms()
-        holonyms += synset.part_holonyms()
-        holonyms += synset.substance_holonyms()
+        holonyms += _get_holonyms(synset)
     
     return holonyms
 
@@ -203,11 +283,8 @@ def get_meronyms(synsets):
     
     for synset in synsets:
         #Perl library WordNet::Similarity doesn't seem to differentiate member_meronyms, part_meronyms, and substance_meronyms. Neither should we.
-        meronyms += synset.member_meronyms()
-        meronyms += synset.part_meronyms()
-        meronyms += synset.substance_meronyms()
+        meronyms += _get_meronyms(synset)
 
-    
     return meronyms
 
 def get_attributes(synsets):
@@ -225,7 +302,7 @@ def get_attributes(synsets):
     attributes=[] #TODO: should I use a set to avoid repeat definitions?
     
     for synset in synsets:
-        attributes += synset.attributes()
+        attributes += _get_attributes(synset)
     
     return attributes
 
@@ -244,7 +321,7 @@ def get_similar_tos(synsets):
     similar_tos=[] #TODO: should I use a set to avoid repeat definitions?
     
     for synset in synsets:
-        similar_tos += synset.similar_tos()
+        similar_tos += _get_similar_tos(synset)
     
     return similar_tos
 
@@ -264,8 +341,6 @@ def get_pertainyms(synsets):
     
     pertainyms=[] #TODO: should I use a set to avoid repeat definitions?
     for synset in synsets:
-        for lemma in synset.lemmas():
-            for pertainym in lemma.pertainyms():
-                pertainyms.append(pertainym.synset())
+        pertainyms += _get_pertainyms(synset)
     
     return pertainyms

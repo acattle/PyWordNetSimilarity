@@ -19,17 +19,16 @@
 from __future__ import print_function #for Python 2.7 compatibility
 from nltk.corpus import wordnet as wn
 from nltk.corpus import stopwords as sw
-import difflib
 from wordnet_similarity_dat_reader import read_relation_file
 from uuid import uuid4
-import pickle
+import difflib
 import re
-import timeit
-from collections import defaultdict
+
+space_pat = re.compile(" ")
 
 class ExtendedLesk:
     
-    def __init__(self, relations_loc, stopwords=None, cache=False):
+    def __init__(self, relations_loc, stopwords=None):
         """
             Initialize the Extended Lesk algorithm
             
@@ -46,11 +45,6 @@ class ExtendedLesk:
             self.stopwords = set(sw.words("english"))
         else:
             self.stopwords = set(stopwords) #casting to set improves membership checking performance
-        
-        self._cache=None
-        if cache:
-            self._cache=defaultdict(dict)
-            
     
     def _getLeadingStopwordCount(self, text):
         """
@@ -111,6 +105,7 @@ class ExtendedLesk:
             :return: A relatedness score which is greater-than or equal-to 0
             :rtype: int
         """
+        #TODO: Omit stopwords? Shorter docs mean faster comparisons
         text_a = list(text_a) #to avoid accidentally editing the list in place
         text_b = list(text_b)
         
@@ -162,30 +157,13 @@ class ExtendedLesk:
             text_a = synsets_a            
             #apply the relevant functions to the first group of synsets
             for a_func in a_funcs:
-                a_func_str = str(a_func)
-                text_a_str = str(text_a)
-                if (self._cache != None) and (text_a_str in self._cache[a_func_str]):
-                    text_a = self._cache[a_func_str][text_a_str]
-                else:
-                    text_a = a_func(text_a)
-                
-                    if (self._cache != None):
-                        self._cache[a_func_str][text_a_str] = text_a
+                text_a = a_func(text_a)
             
             text_b = synsets_b
             #apply the relevant functions to the second group of synsets
             for b_func in b_funcs:
-                b_func_str = str(b_func)
-                text_b_str = str(text_b)
-                if (self._cache != None) and (text_b_str in self._cache[b_func_str]):
-                    text_b = self._cache[b_func_str][text_b_str]
+                text_b = b_func(text_b)
                 
-                else:
-                    text_b = b_func(text_b)
-                
-                    if (self._cache != None):
-                        self._cache[b_func_str][text_b_str] = text_b
-            
             #get the overlap between text_a and text_b and update the relatedness score accordingly
             overlap_score = self.getTextOverlapScore(text_a, text_b)
             relatedness_score = relatedness_score + overlap_score*weight
@@ -205,16 +183,19 @@ class ExtendedLesk:
             :rtype: flaot
         """
         
-        synsets_a = wn.synsets(re.sub(" ", "_", word_a))
-        synsets_b = wn.synsets(re.sub(" ", "_", word_b))
+        synsets_a = wn.synsets(space_pat.sub("_", word_a))
+        synsets_b = wn.synsets(space_pat.sub("_", word_b))
         
         return self.getSynsetRelatedness(synsets_a, synsets_b)
             
         
 if __name__ == '__main__':
+    import pickle
+    import timeit
+
     relations_file = "lesk-relation.dat"
     
-    with open("d:/git/HumourDetection/HumourDetection/src/evocation_estimation/features/usf/word_pairs.pkl", "rb") as wp_file:
+    with open("d:/git/HumourDetection/HumourDetection/src/word_associations/features/usf/word_pairs.pkl", "rb") as wp_file:
         wp = pickle.load(wp_file, encoding="latin1")
     wn.ensure_loaded()
     print ("starting")
