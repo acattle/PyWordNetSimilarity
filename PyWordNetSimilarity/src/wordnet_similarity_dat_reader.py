@@ -1,7 +1,7 @@
 '''
 Created on Nov 27, 2017
 
-:author: Andrew Cattle <acattle@cse.ust.hk>
+:author: Andrew Cattle <acattle@connect.ust.hk>
 '''
 from wordnet_wrappers import get_also_sees, get_attributes, concat_examples,\
     concat_definitions, get_hypernyms, get_holonyms, get_meronyms,\

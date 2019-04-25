@@ -1,7 +1,7 @@
 '''
     Created on Nov 23, 2017
     
-    :author: Andrew Cattle <acattle@cse.ust.hk>
+    :author: Andrew Cattle <acattle@connect.ust.hk>
     
     Wrappers for nltk.corpus.wordnet functions to ensure proper format for
     difflib.SequenceMatcher
